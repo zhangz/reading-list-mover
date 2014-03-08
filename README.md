@@ -1,6 +1,9 @@
 # Reading List Mover
 
-Copy bookmarks between Instapaper, Readability, Pocket, Pinboard, Delicious, Diigo, GitHub, StackOverflow and Twitter.
+Folked from [codebox/reading-list-mover][]:
+
+- Updated to latest APIs. 
+- Only support copy bookmarks between Instapaper, Readability, Pocket.
 
 Here's a small Python library to [copy bookmarks/favourites between a number of online services][source]. The library supports [Instapaper][], [Readability][], [Pocket][] (formerly ReadItLater), [Pinboard][], [Delicious][], [Diigo][], [GitHub][]*, [StackOverflow][]* and [Twitter][]* ('*' indicates export only).
 
@@ -9,15 +12,11 @@ To use the library you will need to populate your copy of the [config.txt][] fil
 - [Readability API key](http://help.readability.com/customer/portal/articles/267466-i%E2%80%99m-a-developer-how-can-i-get-an-api-key-)
 - [Pocket API key](http://getpocket.com/api/signup/)
 - [Instapaper API key](http://www.instapaper.com/main/request_oauth_consumer_token)
-- [Diigo API key](http://www.diigo.com/api_keys/new/)
 
 You will also need to have the [oauth2][] Python library installed on your system.
 
 Here's an example showing how to copy all your bookmarks from one service to another:
 
-## Copy from Pocket to Readability ##
-
-```python
 # Copy all bookmarks from Pocket to Readability
 pocket = buildPocket()
 readability = buildReadability()
@@ -28,14 +27,11 @@ for b in pocket.getBookmarks():
 
 You can also use the library to export a list of your bookmarks for use as a backup:
 
-## Export all Delicious bookmarks
+# Print out all bookmarks from Pocket
+pocket = buildPocket()
 
-```python
-# Print out all bookmarks from Delicious
-delicious = buildDelicious()
-
-for b in delicious.getBookmarks():
-    print b['title'] + ': ' + b['url']
+for b in pocket.getBookmarks():
+    print b['given_title'] + ': ' + b['given_url']
 ```
 
 [source]: https://github.com/codebox/reading-list-mover
@@ -50,3 +46,4 @@ for b in delicious.getBookmarks():
 [Twitter]: http://twitter.com/
 [config.txt]: https://github.com/codebox/reading-list-mover/blob/master/config.txt
 [oauth2]: https://github.com/simplegeo/python-oauth2
+[codebox/reading-list-mover]: https://github.com/codebox/reading-list-mover

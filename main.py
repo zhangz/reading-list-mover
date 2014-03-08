@@ -3,7 +3,7 @@ import json
 import urllib
 import urllib2
 import urlparse
-import simplejson
+import json as simplejson
 from xml.dom.minidom import parseString
 import xml.dom.minidom
 import oauth2
@@ -73,120 +73,17 @@ class HttpAuthClient:
 
     def open(self, url, data=None):
         return self.url_opener.open(url, data)
-
-class StackOverflow:
-    def __init__(self, user):
-        self.get_url  = 'http://api.stackexchange.com/2.1/users/' + user + '/favorites?order=desc&sort=activity&site=stackoverflow'
-
-    def getBookmarks(self):
-        rsp = urllib2.urlopen(self.get_url)
-        if rsp.info().get('Content-Encoding') == 'gzip':
-            buf = StringIO(rsp.read())
-            rsp = gzip.GzipFile(fileobj=buf)
-
-        data = json.load(rsp)
-        return [{'url' : b['link'], 'title' : b['title']} for b in data['items']]
-
-    def addBookmark(self, bookmark):
-        raise Exception('Not supported')
-
-class Github:
-    def __init__(self, user):
-        self.get_url  = 'https://api.github.com/users/' + user + '/starred'
-
-    def getBookmarks(self):
-        rsp = urllib2.urlopen(self.get_url)
-        data = json.load(rsp)
-        return [{'url' : b['url'], 'title' : b['name']} for b in data]
-
-    def addBookmark(self, bookmark):
-        raise Exception('Not supported')
-
-class Twitter:
-    def __init__(self, user):
-        self.user = user
-        self.get_url  = 'https://api.twitter.com/1/favorites.json?count=200&screen_name=' + user
-
-    def getBookmarks(self):
-        rsp = urllib2.urlopen(self.get_url)
-        data = json.load(rsp)
-        return [{'url' : 'http://twitter.com/' + self.user + '/status/' + b['id_str'], 'title' : b['text']} for b in data]
-
-    def addBookmark(self, bookmark):
-        raise Exception('Not supported')
-
-class Diigo(HttpAuthClient):
-    def __init__(self, user, password, key):
-        self.get_url  = 'https://secure.diigo.com/api/v2/bookmarks?key=' + key + '&user=' + user
-        self.add_url  = 'https://secure.diigo.com/api/v2/bookmarks'
-        self.key = key
-        HttpAuthClient.__init__(self, user, password)
-
-    def getBookmarks(self):
-        data = json.load(self.open(self.get_url))
-        return [{'url' : b['url'], 'title' : b['title']} for b in data]
-
-    def addBookmark(self, bookmark):
-        add_args=urllib.urlencode({'url' : bookmark['url'], 'title' : bookmark['title'], 'key' : self.key, 'shared' : 'yes'})
-        self.open(self.add_url, add_args)
-        '''
-        During testing the Diigo service sometimes returned a '500 Server error' when adding lots of bookmarks in rapid succession, adding
-        a brief pause between 'add' operations seemed to fix it - YMMV
-        time.sleep(1) 
-        '''
-
-class DeliciousLike(HttpAuthClient):
-    def __init__(self, user, password):
-        HttpAuthClient.__init__(self, user, password)
-
-    def getBookmarks(self):
-        xml = self.open(self.get_url).read()
-        dom = parseString(xml)
-        
-        urls = []
-        for n in dom.firstChild.childNodes:
-            if n.nodeType == n.ELEMENT_NODE:
-                urls.append({'url' : n.getAttribute('href'), 'title' : n.getAttribute('description')})
-                
-        return urls
-        
-    def addBookmark(self, bookmark):
-        params = urllib.urlencode({'url' : bookmark['url'], 'description' : bookmark['title'].encode('utf-8')})
-        self.open(self.add_url + params)
-
-class PinBoard(DeliciousLike):
-    def __init__(self, user, password):
-        self.get_url  = 'https://api.pinboard.in/v1/posts/all'
-        self.add_url  = 'https://api.pinboard.in/v1/posts/add?'
-        
-        DeliciousLike.__init__(self, user, password)
-
-class PinBoard2(DeliciousLike):
-    def __init__(self, user, token):
-        auth_token = user + ':' + token
-        self.get_url  = 'https://api.pinboard.in/v1/posts/all?auth_token=' + auth_token
-        self.add_url  = 'https://api.pinboard.in/v1/posts/add?auth_token=' + auth_token + '&'
-
-    def open(self, url, data=None):
-        return urllib2.urlopen(url, data)
-
-class Delicious(DeliciousLike):
-    def __init__(self, user, password):
-        self.get_url  = 'https://api.del.icio.us/v1/posts/all'
-        self.add_url  = 'https://api.del.icio.us/v1/posts/add?'
-        
-        DeliciousLike.__init__(self, user, password)
         
 class Pocket:
-    def __init__(self, user, password, key):
-        base_args=urllib.urlencode({'username' : user, 'password' : password, 'apikey' : key})
-        self.get_url = 'https://readitlaterlist.com/v2/get?' + base_args + '&'
-        self.add_url = 'https://readitlaterlist.com/v2/add?' + base_args + '&' 
+    def __init__(self, key, token):
+        base_args=urllib.urlencode({'consumer_key' : key, 'access_token' : token, 'sort' : 'oldest'})
+        self.get_url = 'https://getpocket.com/v3/get?' + base_args + '&'
+        self.add_url = 'https://getpocket.com/v3/add?' + base_args + '&' 
 
     def getBookmarks(self):
         get_args=urllib.urlencode({'state' : 'unread'})
         data = json.load(urllib2.urlopen(self.get_url + get_args))
-        return [{'url' : b['url'], 'title' : b['title']} for b in data['list'].values()]
+        return [{'url' : b['given_url'], 'title' : b['given_title']} for b in data['list'].values()]
         
     def addBookmark(self, bookmark):
         add_args=urllib.urlencode({'url' : bookmark['url']})
@@ -201,37 +98,10 @@ def buildReadability():
 
 def buildPocket():
     SECTION = 'Pocket'
-    return Pocket(config.get(SECTION, 'user'), config.get(SECTION, 'password'), config.get(SECTION, 'key'))
-
-def buildPinBoard():
-    SECTION = 'PinBoard'
-    return PinBoard(config.get(SECTION, 'user'), config.get(SECTION, 'password'))
-
-def buildPinBoard2():
-    SECTION = 'PinBoard'
-    return PinBoard2(config.get(SECTION, 'user'), config.get(SECTION, 'token'))
-
-def buildDelicious():
-    SECTION = 'Delicious'
-    return Delicious(config.get(SECTION, 'user'), config.get(SECTION, 'password'))
+    return Pocket(config.get(SECTION, 'key'), config.get(SECTION, 'token'))
 
 def buildInstapaper():
     SECTION = 'Instapaper'
     return Instapaper(config.get(SECTION, 'key'), config.get(SECTION, 'secret'), config.get(SECTION, 'user'), config.get(SECTION, 'password'))
 
-def buildDiigo():
-    SECTION = 'Diigo'
-    return Diigo(config.get(SECTION, 'user'), config.get(SECTION, 'password'), config.get(SECTION, 'key'))
-
-def buildStackOverflow():
-    SECTION = 'StackOverflow'
-    return StackOverflow(config.get(SECTION, 'user'))
-
-def buildGithub():
-    SECTION = 'Github'
-    return Github(config.get(SECTION, 'user'))
-
-def buildTwitter():
-    SECTION = 'Twitter'
-    return Twitter(config.get(SECTION, 'user'))
 
